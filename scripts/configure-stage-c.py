@@ -1,6 +1,6 @@
 """Idempotent stage-C wiring (task book §8.3, §9.2, §9.3).
-Bazarr: Sonarr/Radarr connections, one language profile (简中 + 繁中 + English)
-as default for series and movies, no-account providers only.
+Bazarr: Sonarr/Radarr connections; default profile Chinese (either script), English-
+original titles (Arr auto-tag en-orig) Chinese + English; no-account providers only.
 AutoBangumi: native qBittorrent as downloader, save under Z:\\LER-MEDIA\\media\\anime.
 Suwayomi: CBZ on, downloads to /data/media/comics.
 Keys come from / are written to D:\\My Media\\.env; nothing secret is printed."""
@@ -64,12 +64,35 @@ if "BAZARR_API_KEY" not in os.environ:
 B = "http://localhost:6767/api"
 BH = {"X-API-KEY": os.environ["BAZARR_API_KEY"]}
 
-profile = [{
-    "profileId": 1, "name": "简繁中+英", "cutoff": None, "mustContain": [], "mustNotContain": [],
-    "originalFormat": False, "tag": None,
-    "items": [{"id": i + 1, "language": code, "audio_exclude": "False", "audio_only_include": "False",
-               "hi": "False", "forced": "False"} for i, code in enumerate(("zh", "zt", "en"))],
-}]
+# Owner 2026-10-29: English-original titles get Chinese + English; everything else
+# Chinese only, simplified or traditional either way. Sonarr/Radarr auto-tag
+# English-original items "en-orig"; Bazarr maps that tag to profile 2.
+EN_TAG = "en-orig"
+for app, port in (("sonarr", 8989), ("radarr", 7878)):
+    base, hk = f"http://localhost:{port}/api/v3", {"X-Api-Key": os.environ[f"{app.upper()}_API_KEY"]}
+    tag = next((t for t in http(f"{base}/tag", headers=hk) if t["label"] == EN_TAG), None)         or http(f"{base}/tag", "POST", {"label": EN_TAG}, hk)
+    if not any(r["name"] == "English original" for r in http(f"{base}/autotagging", headers=hk)):
+        spec = next(x for x in http(f"{base}/autotagging/schema", headers=hk)
+                    if x["implementation"] == "OriginalLanguageSpecification")
+        spec.update(name="English", negate=False, required=True)
+        spec["fields"][0]["value"] = 1  # English
+        http(f"{base}/autotagging", "POST", {"name": "English original", "removeTagsAutomatically": True,
+                                             "tags": [tag["id"]], "specifications": [spec]}, hk)
+        print(f"{app}: auto-tag English-original -> {EN_TAG}")
+
+
+def item(i, code):
+    return {"id": i, "language": code, "audio_exclude": "False", "audio_only_include": "False",
+            "hi": "False", "forced": "False"}
+
+
+profile = [
+    # Cutoff 65535 = "any": stop once either Chinese variant is found.
+    {"profileId": 1, "name": "中文（简繁任一）", "cutoff": 65535, "mustContain": [], "mustNotContain": [],
+     "originalFormat": False, "tag": None, "items": [item(1, "zh"), item(2, "zt")]},
+    {"profileId": 2, "name": "中英（英语原片）", "cutoff": None, "mustContain": [], "mustNotContain": [],
+     "originalFormat": False, "tag": EN_TAG, "items": [item(1, "zh"), item(2, "en")]},
+]
 providers = ["embeddedsubtitles", "podnapisi", "yifysubtitles", "zimuku"]  # no account needed
 form = {
     "settings-general-use_sonarr": "true", "settings-general-use_radarr": "true",
@@ -79,6 +102,7 @@ form = {
     "settings-radarr-apikey": os.environ["RADARR_API_KEY"],
     "settings-general-serie_default_enabled": "true", "settings-general-serie_default_profile": "1",
     "settings-general-movie_default_enabled": "true", "settings-general-movie_default_profile": "1",
+    "settings-general-serie_tag_enabled": "true", "settings-general-movie_tag_enabled": "true",
     "settings-general-enabled_providers": providers,
     "languages-enabled": ["zh", "zt", "en"],
     "languages-profiles": json.dumps(profile, ensure_ascii=False),
@@ -86,7 +110,8 @@ form = {
 http(f"{B}/system/settings", "POST", form, BH, form=True)
 s = http(f"{B}/system/settings", headers=BH)
 print("bazarr: sonarr", s["general"]["use_sonarr"], "radarr", s["general"]["use_radarr"],
-      "providers", s["general"]["enabled_providers"], "default profiles",
+      "providers", s["general"]["enabled_providers"], "tag profiles",
+      s["general"]["serie_tag_enabled"], s["general"]["movie_tag_enabled"], "default profiles",
       s["general"]["serie_default_profile"], s["general"]["movie_default_profile"])
 
 # --- AutoBangumi ----------------------------------------------------------

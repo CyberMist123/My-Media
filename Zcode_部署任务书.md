@@ -33,7 +33,7 @@
 | D5 | **画质与字幕** | 取消固定 1080p/4K 手选限制，在可用高清版本中自动择优；1080p 与 4K 都是候选。字幕：简体/繁体中文 + 英文。字幕组质量由 AI 结合作品和发行信息主动研究（必要时联网）。 |
 | D6 | **不碰现有磁盘与数据** | 禁止对任何现有物理磁盘/分区做分区、缩容、格式化、移动、改写；禁止迁移用户已有媒体。首选在用户批准的现存盘目录下**新建**一个独立 VHDX 文件（§6）。 |
 | D7 | **Fable 走 CLI，不走 MCP**（2026-10-29 改定） | Fable 的 MCP 只支持 stdio、每回合须 8 秒内握手全部 MCP，HTTP MCP 要额外 `mcp-remote` 代理进程，不划算。影视栈统一由 `D:\My Media\tools\arr-cli`（调用各服务原生 REST API）接入；AutoBangumi、Suwayomi 在阶段 C 以子命令加入同一 CLI。不改 Fable 运行配置，只经卡片登记用法。 |
-| D8 | **固定路径与存储事实** | `Z:` 是**已存在的真实硬盘/分区**，总容量约 476 GB（Windows 显示值），2026-10-29 实测可用 140.4 GB；`Z:\影视`（约 322 GB）本身是影视库，日后整体并入媒体库。媒体根目录 `Z:\LER-MEDIA`；程序目录 `D:\My Media`（含 compose、脚本、reports；路径含空格，所有脚本必须加引号）。`Z:` 本身不新建、不分区、不格式化。**用户已选 §6.1 模式 B，分两阶段**：① 测试阶段（已完成 2026-10-29）：`Z:\.storage\LER-MEDIA.vhdx` 动态 35 GB（`maximum=33379` MiB），NTFS，标签 `LER-MEDIA`，同时挂在 `Z:\LER-MEDIA`（Windows 原生程序用）与盘符 `M:`（Docker/WSL 用，见 §6.1）；② 全流程跑通后经批准扩到 450GB 并把 `Z:\影视` 迁入。`Z:\FableBackup` 及其余数据始终不动。 |
+| D8 | **固定路径与存储事实** | `Z:` 是**已存在的真实硬盘/分区**，总容量约 476 GB（Windows 显示值），2026-10-29 实测可用 140.4 GB；`Z:\影视`（约 322 GB）本身是影视库，日后整体并入媒体库。媒体根目录 `Z:\LER-MEDIA`；程序目录 `D:\My Media`（含 compose、脚本、reports；路径含空格，所有脚本必须加引号）。`Z:` 本身不新建、不分区、不格式化。**用户已选 §6.1 模式 B，分两阶段**：① 测试阶段（已完成 2026-10-29）：`Z:\.storage\LER-MEDIA.vhdx` 动态 35 GB（`maximum=33379` MiB），NTFS，标签 `LER-MEDIA`，同时挂在 `Z:\LER-MEDIA`（Windows 原生程序用）与盘符 `M:`（Docker/WSL 用，见 §6.1）；② 全流程跑通后经批准扩到 450GB 并把 `Z:\影视` 迁入。`Z:\FableBackup` 及其余数据始终不动。**容量约束**：`Z:` 总 512.1 GB，当前 `影视` 322.6 GB + `FableBackup` 23 GB；450GB VHDX 只有在 `影视` 迁入 VHDX 之后才装得下（迁入后 Z: 上为 VHDX ≤450 GB + FableBackup 23 GB ≈ 473 GB）。迁入不能整体复制（没有 322 GB 空余），只能**分批移动**：每批复制 ≤ 当前 Z: 可用空间减 20 GB 余量的量到 VHDX 内、校验后删除源、再下一批；每批前展示清单并批准，校验方式为文件数与字节数一致或哈希抽样。这是独立的批准步骤，不与扩容合并执行。 |
 
 **需求不可被“优化”**：作品、范围、来源、清晰度、音轨、字幕语言、字幕组、是否全部下载、是否追更，按用户所说执行。缺来源/缺空间/技术受限时报告具体阻断与可选方案；不得以“稳定/风险/最小可行版本”为由偷换分辨率、只下一季、关闭追更、删文件或把请求拆成缩小范围的“完成”。
 
@@ -41,7 +41,7 @@
 
 1. 发现既有 Docker、WSL、Jellyfin、下载器、端口、媒体目录时优先复用；所有修改前记录原状。
 2. 不覆盖现有容器/数据库，不改全局注册表、区域设置、代码页、`.wslconfig`，不升级 Windows，不关闭安全保护，不破坏其他服务，不重写其他项目脚本。
-3. 禁止 `Clear-Disk`、`Resize-Partition`、对现有 Disk Number/Volume 做 Initialize/Format、`docker system prune`、`compose down -v`、删除非本项目容器/卷。
+3. 对任何**物理**磁盘/分区禁止 `Clear-Disk`、`Resize-Partition`、Initialize/Format；本项目自己的 VHDX 虚拟盘（`Z:\.storage\LER-MEDIA.vhdx`）的 `expand vdisk` / `Resize-Partition` 允许，但属 §3 需批准项，执行前核对目标 Disk Number 不是 `Z:` 所在的 Disk 0。禁止 `docker system prune`、`compose down -v`、删除非本项目容器/卷。
 4. 账号密码、PT passkey、Cookie、API Key、MCP Token 是秘密：只放本地 `.env` 或产品自身秘密存储；不进日志、报告、Git、聊天、示例配置、健康检查输出。
 5. 组件版本固定到官方 release 页核查过的稳定版和镜像 tag/digest；不用 `develop`/`nightly`/浮动 `latest`，禁用应用内与容器自动升级。
 6. 组件与 Win10 或现有 Fable 不兼容时，用成熟受支持的替代；找不到就留阻断项。**禁止编造“已支持/已通过”**。

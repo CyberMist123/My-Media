@@ -28,10 +28,16 @@ try {
     $vol = Get-Volume -FileSystemLabel $Label -ErrorAction SilentlyContinue
     if (-not $vol) { throw "volume labelled $Label not found after attach" }
     $part = $vol | Get-Partition
+    # Stop Windows from handing the volume a random extra letter on every attach;
+    # the only access paths must be M: and the Z:\LER-MEDIA mount point.
+    if (-not $part.NoDefaultDriveLetter) { $part | Set-Partition -NoDefaultDriveLetter $true; Say "set NoDefaultDriveLetter" }
     $paths = @($part.AccessPaths)
+    foreach ($p in $paths) {
+        if ($p -match '^[A-Z]:\\$' -and $p -ne "${Letter}:\") { $part | Remove-PartitionAccessPath -AccessPath $p; Say "removed stray letter $p" }
+    }
 
     if (-not ($paths -contains "${Letter}:\")) {
-        if (Get-PSDrive -Name $Letter -ErrorAction SilentlyContinue) { throw "${Letter}: is taken by another volume" }
+        if (Get-Volume -DriveLetter $Letter -ErrorAction SilentlyContinue) { throw "${Letter}: is taken by another volume" }
         $part | Add-PartitionAccessPath -AccessPath "${Letter}:"
         Say "assigned ${Letter}:"
     }

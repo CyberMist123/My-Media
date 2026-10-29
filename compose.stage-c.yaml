@@ -1,0 +1,61 @@
+# Stage C services (subtitles, anime RSS, comics). Same compose project as
+# compose.yaml; start.ps1 brings both files up behind the storage gate.
+name: ler-media
+
+services:
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:v1.6.2-ls370
+    restart: unless-stopped
+    environment:
+      TZ: Australia/Sydney
+      PUID: "1000"
+      PGID: "1000"
+    ports: ["127.0.0.1:6767:6767"]
+    volumes:
+      - bazarr-config:/config
+      - type: bind
+        source: 'M:\'
+        target: /data
+        bind:
+          create_host_path: false
+
+  # 3.3.7 rather than the 4.0.0 major released 2026-10-24 (task book §5: no
+  # fresh major without its own acceptance; Fable uses the REST API, not its MCP).
+  # It never touches media files itself: qBittorrent (native) downloads and
+  # renames under Z:\LER-MEDIA\media\anime.
+  autobangumi:
+    image: estrellaxd/auto_bangumi:3.3.7
+    restart: unless-stopped
+    environment:
+      TZ: Australia/Sydney
+      PUID: "1000"
+      PGID: "1000"
+      UMASK: "022"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports: ["127.0.0.1:7892:7892"]
+    volumes:
+      - autobangumi-config:/app/config
+      - autobangumi-data:/app/data
+
+  suwayomi:
+    image: ghcr.io/suwayomi/suwayomi-server:v2.4.2366
+    restart: unless-stopped
+    environment:
+      TZ: Australia/Sydney
+      DOWNLOAD_AS_CBZ: "true"
+      AUTO_DOWNLOAD_CHAPTERS: "false"
+    ports: ["127.0.0.1:4567:4567"]
+    volumes:
+      - suwayomi-data:/home/suwayomi/.local/share/Tachidesk
+      - type: bind
+        source: 'M:\media\comics'
+        target: /data/media/comics
+        bind:
+          create_host_path: false
+
+volumes:
+  bazarr-config:
+  autobangumi-config:
+  autobangumi-data:
+  suwayomi-data:

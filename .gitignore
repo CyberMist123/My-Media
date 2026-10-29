@@ -2,3 +2,4 @@
 .storage/
 *.vhdx
 reports/*.log
+__pycache__/

@@ -167,6 +167,13 @@ def cmd_space(a):
 
 
 def main():
+    # PowerShell 5.1 / cmd default to the ANSI code page; force UTF-8 so
+    # Chinese titles never raise UnicodeEncodeError and JSON stays valid.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
     load_env()
     p = argparse.ArgumentParser(prog="arr", description="Fable media-stack CLI (no delete commands)")
     sub = p.add_subparsers(dest="cmd", required=True)

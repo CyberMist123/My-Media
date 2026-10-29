@@ -3,3 +3,6 @@
 *.vhdx
 reports/*.log
 __pycache__/
+installers/
+Server/
+jellyfin-data/

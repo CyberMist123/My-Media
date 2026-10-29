@@ -1,4 +1,4 @@
 .env
-storage/
+.storage/
 *.vhdx
 reports/*.log

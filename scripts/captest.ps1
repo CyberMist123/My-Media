@@ -7,7 +7,7 @@ $vhdx = 'Z:\.storage\captest.vhdx'
 $mnt = 'Z:\.storage\captest-mnt'
 $log = 'D:\My Media\reports\captest.log'
 function Say($m) { $l = "$(Get-Date -Format s) $m"; Write-Output $l; Add-Content -LiteralPath $log -Value $l -Encoding utf8 }
-function Diskpart($lines) {
+function Invoke-Diskpart($lines) {
     $f = Join-Path $env:TEMP 'captest-dp.txt'
     ($lines -join "`r`n") | Set-Content -LiteralPath $f -Encoding ascii
     diskpart /s $f | Out-Null
@@ -18,7 +18,7 @@ if (Test-Path -LiteralPath $vhdx) { throw "$vhdx already exists; remove it first
 New-Item -ItemType Directory -Force $mnt | Out-Null
 $result = 'FAILED_CAP_TEST'
 try {
-    Diskpart @("create vdisk file=`"$vhdx`" maximum=300 type=expandable", 'attach vdisk', 'convert gpt',
+    Invoke-Diskpart @("create vdisk file=`"$vhdx`" maximum=300 type=expandable", 'attach vdisk', 'convert gpt',
                'create partition primary', 'format fs=ntfs label="CAPTEST" quick', "assign mount=`"$mnt`"")
     $part = Get-Volume -FileSystemLabel CAPTEST | Get-Partition
     $part | Set-Partition -NoDefaultDriveLetter $true
@@ -48,7 +48,7 @@ try {
 
     if ($refused -and -not $write2 -and $recovered -and $vol.Size -le 314572800) { $result = 'CAP_ENFORCED' }
 } finally {
-    try { Diskpart @("select vdisk file=`"$vhdx`"", 'detach vdisk') } catch { Say "detach: $($_.Exception.Message)" }
+    try { Invoke-Diskpart @("select vdisk file=`"$vhdx`"", 'detach vdisk') } catch { Say "detach: $($_.Exception.Message)" }
     Remove-Item -LiteralPath $vhdx -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $mnt -Force -Recurse -ErrorAction SilentlyContinue
     Say "cleanup: vhdx gone=$(-not (Test-Path -LiteralPath $vhdx))"

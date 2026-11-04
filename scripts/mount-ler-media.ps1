@@ -15,8 +15,11 @@ function Say($m) { $l = "$(Get-Date -Format s) $m"; Write-Output $l; Add-Content
 try {
     if (-not (Test-Path -LiteralPath $Vhdx)) { throw "VHDX not found: $Vhdx" }
 
-    $img = Get-DiskImage -ImagePath $Vhdx
-    if (-not $img.Attached) {
+    # Get-DiskImage sometimes throws "Access denied" (storage WMI glitch) even
+    # elevated; fall back to "attach if the volume isn't visible yet".
+    try { $attached = (Get-DiskImage -ImagePath $Vhdx -ErrorAction Stop).Attached }
+    catch { $attached = [bool](Get-Volume -FileSystemLabel $Label -ErrorAction SilentlyContinue) }
+    if (-not $attached) {
         $script = Join-Path $env:TEMP 'ler-attach.txt'
         "select vdisk file=`"$Vhdx`"`r`nattach vdisk" | Set-Content -LiteralPath $script -Encoding ascii
         diskpart /s $script | Out-Null
